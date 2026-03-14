@@ -202,6 +202,9 @@ class BotController {
       config.risk.maxPositionSize = Number(runtimeSettings.max_position_size);
       config.risk.maxOpenOrders = Number(runtimeSettings.max_open_orders);
       config.risk.dailyLossLimit = Number(runtimeSettings.daily_loss_limit);
+      config.strategy.immediateEntryOnStart = Boolean(
+        runtimeSettings.metadata?.immediateEntryOnStart
+      );
     } catch (error) {
       console.error("Failed to load runtime settings:", error.message);
     }
@@ -219,8 +222,61 @@ class BotController {
         autoMarketSelection: config.strategy.autoMarketSelection,
         autoMarketSelectionCount: config.strategy.autoMarketSelectionCount,
         autoMarketRefreshMs: config.strategy.autoMarketRefreshMs,
+        immediateEntryOnStart: config.strategy.immediateEntryOnStart,
       },
     };
+  }
+
+  async seedImmediateEntries() {
+    if (!config.strategy.immediateEntryOnStart || !this.strategyEngine.enabled) {
+      return;
+    }
+
+    try {
+      const ticker = await apiClient.getTicker();
+      const priceByMarket = new Map(
+        ticker
+          .filter((item) => config.tradeMarkets.includes(item.market))
+          .map((item) => [item.market, Number(item.last_price || item.bid || item.ask)])
+      );
+
+      let attempted = 0;
+      let successful = 0;
+
+      for (const market of config.tradeMarkets) {
+        if (this.orderManager.hasActiveExposure(market)) {
+          continue;
+        }
+
+        const price = priceByMarket.get(market);
+        if (!Number.isFinite(price) || price <= 0) {
+          continue;
+        }
+
+        attempted += 1;
+        const result = await this.orderManager.executeEntrySignal({
+          market,
+          price,
+          strategyName: "scalping",
+          marketMeta: this.marketMetadata.get(market) || {},
+        });
+
+        if (result.success) {
+          successful += 1;
+        }
+      }
+
+      await db.insertLog("info", "Immediate entry on start completed", {
+        enabled: true,
+        attempted,
+        successful,
+        tradeMarkets: config.tradeMarkets,
+      }).catch(() => {});
+    } catch (error) {
+      await db.insertLog("warn", "Immediate entry on start failed", {
+        error: error.message,
+      }).catch(() => {});
+    }
   }
 
   async applyAutoMarketSelection() {
@@ -303,6 +359,7 @@ class BotController {
     }, Math.max(config.strategy.repriceIntervalMs, config.strategy.minRepriceIntervalMs));
     this.botRunning = true;
     await db.insertLog("info", "Bot started", { mode: config.botMode }).catch(() => {});
+    await this.seedImmediateEntries();
     return this.getStatus();
   }
 
@@ -400,6 +457,9 @@ class BotController {
     if (Number.isFinite(Number(body.dipBuyPercent))) {
       strategyPatch.dipBuyPercent = Number(body.dipBuyPercent);
     }
+    if (typeof body.immediateEntryOnStart === "boolean") {
+      strategyPatch.immediateEntryOnStart = body.immediateEntryOnStart;
+    }
     if (Number.isFinite(Number(body.stopLossPercent))) {
       strategyPatch.stopLossPercent = Number(body.stopLossPercent);
     }
@@ -453,6 +513,7 @@ class BotController {
       enabled: this.strategyEngine.enabled,
       profitTargetPercent: config.strategy.profitTargetPercent,
       dipBuyPercent: config.strategy.dipBuyPercent,
+      immediateEntryOnStart: config.strategy.immediateEntryOnStart,
       stopLossPercent: config.strategy.stopLossPercent,
       repriceIntervalMs: config.strategy.repriceIntervalMs,
       repriceThresholdPercent: config.strategy.repriceThresholdPercent,
@@ -475,6 +536,7 @@ class BotController {
         autoMarketSelection: config.strategy.autoMarketSelection,
         autoMarketSelectionCount: config.strategy.autoMarketSelectionCount,
         autoMarketRefreshMs: config.strategy.autoMarketRefreshMs,
+        immediateEntryOnStart: config.strategy.immediateEntryOnStart,
       },
     }).catch(async (error) => {
       await db.insertLog("warn", "Failed to persist runtime settings", {
@@ -491,7 +553,7 @@ class BotController {
   }
 
   async getMarkets() {
-    return this.marketScanner.scanTopMarkets(10);
+    return this.marketScanner.scanTopMarkets(120);
   }
 
   async updateMarkets(body) {

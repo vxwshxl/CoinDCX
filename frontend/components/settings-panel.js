@@ -22,6 +22,7 @@ export function SettingsPanel({ status, onUpdated }) {
     dailyLossLimit: 500,
     profitTargetPercent: 0.5,
     dipBuyPercent: 0.3,
+    immediateEntryOnStart: false,
     stopLossPercent: 1,
     repriceIntervalMs: 3000,
     repriceThresholdPercent: 0.15,
@@ -43,6 +44,7 @@ export function SettingsPanel({ status, onUpdated }) {
       dailyLossLimit: status?.risk?.dailyLossLimit ?? 500,
       profitTargetPercent: status?.strategy?.profitTargetPercent ?? 0.5,
       dipBuyPercent: status?.strategy?.dipBuyPercent ?? 0.3,
+      immediateEntryOnStart: status?.strategy?.immediateEntryOnStart ?? false,
       stopLossPercent: status?.strategy?.stopLossPercent ?? 1,
       repriceIntervalMs: status?.strategy?.repriceIntervalMs ?? 3000,
       repriceThresholdPercent: status?.strategy?.repriceThresholdPercent ?? 0.15,
@@ -210,6 +212,21 @@ export function SettingsPanel({ status, onUpdated }) {
               <Switch
                 checked={form.enabled}
                 onCheckedChange={(checked) => setForm((current) => ({ ...current, enabled: checked }))}
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-secondary/35 p-4">
+              <div>
+                <div className="font-medium">Immediate Entry On Start</div>
+                <p className="text-sm text-muted-foreground">
+                  Place an entry at the current ticker price for each active market whenever the bot starts.
+                </p>
+              </div>
+              <Switch
+                checked={form.immediateEntryOnStart}
+                onCheckedChange={(checked) =>
+                  setForm((current) => ({ ...current, immediateEntryOnStart: checked }))
+                }
               />
             </div>
 

@@ -12,6 +12,7 @@ class StrategyEngine extends EventEmitter {
       tradeSize: config.strategy.tradeSize,
       profitTargetPercent: config.strategy.profitTargetPercent,
       dipBuyPercent: config.strategy.dipBuyPercent,
+      immediateEntryOnStart: config.strategy.immediateEntryOnStart,
       stopLossPercent: config.strategy.stopLossPercent,
       repriceIntervalMs: config.strategy.repriceIntervalMs,
       repriceThresholdPercent: config.strategy.repriceThresholdPercent,
@@ -39,6 +40,7 @@ class StrategyEngine extends EventEmitter {
       markets: config.tradeMarkets,
       metadata: {
         stopLossPercent: this.parameters.stopLossPercent,
+        immediateEntryOnStart: this.parameters.immediateEntryOnStart,
         repriceIntervalMs: this.parameters.repriceIntervalMs,
         repriceThresholdPercent: this.parameters.repriceThresholdPercent,
         makerBufferPercent: this.parameters.makerBufferPercent,
@@ -62,6 +64,10 @@ class StrategyEngine extends EventEmitter {
     if (Number.isFinite(Number(nextConfig.dipBuyPercent))) {
       this.parameters.dipBuyPercent = Number(nextConfig.dipBuyPercent);
       config.strategy.dipBuyPercent = this.parameters.dipBuyPercent;
+    }
+    if (typeof nextConfig.immediateEntryOnStart === "boolean") {
+      this.parameters.immediateEntryOnStart = nextConfig.immediateEntryOnStart;
+      config.strategy.immediateEntryOnStart = this.parameters.immediateEntryOnStart;
     }
     if (Number.isFinite(Number(nextConfig.stopLossPercent))) {
       this.parameters.stopLossPercent = Number(nextConfig.stopLossPercent);
@@ -96,6 +102,7 @@ class StrategyEngine extends EventEmitter {
       markets: config.tradeMarkets,
       metadata: {
         stopLossPercent: this.parameters.stopLossPercent,
+        immediateEntryOnStart: this.parameters.immediateEntryOnStart,
         repriceIntervalMs: this.parameters.repriceIntervalMs,
         repriceThresholdPercent: this.parameters.repriceThresholdPercent,
         makerBufferPercent: this.parameters.makerBufferPercent,

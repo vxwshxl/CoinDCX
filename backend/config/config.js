@@ -35,6 +35,7 @@ module.exports = {
     tradeSize: parseNumber(process.env.TRADE_SIZE, 300),
     profitTargetPercent: parseNumber(process.env.PROFIT_TARGET_PERCENT, 0.5),
     dipBuyPercent: parseNumber(process.env.DIP_BUY_PERCENT, 0.3),
+    immediateEntryOnStart: parseBoolean(process.env.IMMEDIATE_ENTRY_ON_START, false),
     stopLossPercent: parseNumber(process.env.STOP_LOSS_PERCENT, 1),
     repriceIntervalMs: Math.max(
       parseNumber(process.env.REPRICE_INTERVAL_MS, 3000),

@@ -14,6 +14,7 @@ export function MarketScannerPanel({ status, markets = [], onUpdated }) {
   const [autoCount, setAutoCount] = useState(status?.automation?.autoMarketSelectionCount || 8);
   const [autoRefreshMs, setAutoRefreshMs] = useState(status?.automation?.autoMarketRefreshMs || 120000);
   const [autoEnabled, setAutoEnabled] = useState(status?.automation?.autoMarketSelection || false);
+  const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [autoSelecting, setAutoSelecting] = useState(false);
   const { pushToast } = useToast();
@@ -24,6 +25,23 @@ export function MarketScannerPanel({ status, markets = [], onUpdated }) {
     setAutoRefreshMs(status?.automation?.autoMarketRefreshMs || 120000);
     setAutoEnabled(status?.automation?.autoMarketSelection || false);
   }, [status]);
+
+  const visibleMarkets = markets.filter((market) => {
+    const term = search.trim().toLowerCase();
+    if (!term) return true;
+    return [
+      market.market,
+      market.pair,
+      market.baseCurrency,
+      market.targetCurrency,
+    ]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(term));
+  });
+
+  function addMarkets(marketsToAdd) {
+    setSelected((current) => [...new Set([...current, ...marketsToAdd])]);
+  }
 
   async function saveMarkets() {
     setSaving(true);
@@ -117,8 +135,56 @@ export function MarketScannerPanel({ status, markets = [], onUpdated }) {
             </select>
           </div>
         </div>
+        <div className="grid gap-4 rounded-2xl border border-white/10 bg-secondary/20 p-4 md:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto]">
+          <div className="space-y-2">
+            <Label htmlFor="market-search">Search Markets</Label>
+            <Input
+              id="market-search"
+              type="text"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="BTC, INR, USDT, pair..."
+            />
+          </div>
+          <LoadingButton
+            type="button"
+            variant="secondary"
+            loading={false}
+            onClick={() => addMarkets(visibleMarkets.slice(0, 20).map((market) => market.market))}
+            className="self-end"
+          >
+            Select Top 20
+          </LoadingButton>
+          <LoadingButton
+            type="button"
+            variant="secondary"
+            loading={false}
+            onClick={() => addMarkets(visibleMarkets.slice(0, 50).map((market) => market.market))}
+            className="self-end"
+          >
+            Select Top 50
+          </LoadingButton>
+          <LoadingButton
+            type="button"
+            variant="secondary"
+            loading={false}
+            onClick={() => addMarkets(visibleMarkets.map((market) => market.market))}
+            className="self-end"
+          >
+            Select All Visible
+          </LoadingButton>
+          <LoadingButton
+            type="button"
+            variant="secondary"
+            loading={false}
+            onClick={() => setSelected([])}
+            className="self-end"
+          >
+            Clear
+          </LoadingButton>
+        </div>
         <div className="grid gap-4 lg:grid-cols-2">
-          {markets.map((market) => {
+          {visibleMarkets.map((market) => {
             const active = selected.includes(market.market);
             return (
               <button
@@ -155,7 +221,7 @@ export function MarketScannerPanel({ status, markets = [], onUpdated }) {
         </div>
         <div className="flex flex-wrap gap-3">
           <LoadingButton loading={saving} onClick={saveMarkets}>
-            Apply Selected Markets
+            Apply {selected.length} Selected Markets
           </LoadingButton>
           <LoadingButton loading={autoSelecting} variant="secondary" onClick={saveAutoSelection}>
             Save Auto Selection

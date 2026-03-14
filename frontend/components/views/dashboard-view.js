@@ -23,6 +23,31 @@ export function DashboardView() {
   const summary = status?.metrics?.summary || {};
   const openPositions = status?.orders?.openPositions || [];
   const pendingOrders = status?.orders?.openOrders || [];
+  const immediateEntryOnStart = status?.strategy?.immediateEntryOnStart;
+  const signalState = !status?.running
+    ? {
+        label: "stopped",
+        detail: "Bot is not running.",
+      }
+    : !status?.strategy?.enabled
+      ? {
+          label: "disabled",
+          detail: "Strategy signals are disabled.",
+        }
+      : openPositions.length > 0 || pendingOrders.length > 0
+        ? {
+            label: "active",
+            detail: "Open exposure or pending orders are already being managed.",
+          }
+        : immediateEntryOnStart
+          ? {
+              label: "start entry armed",
+              detail: "New starts will place immediate entries for active markets.",
+            }
+          : {
+              label: "waiting for dip signal",
+              detail: "Bot is live and waiting for the configured dip threshold to trigger an entry.",
+            };
 
   return (
     <AppShell connectionState={connectionState}>
@@ -85,6 +110,7 @@ export function DashboardView() {
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Bot Mode" value={status?.mode || "paper"} detail="Runtime execution mode" />
+        <MetricCard label="Signal State" value={signalState.label} detail={signalState.detail} />
         <MetricCard
           label="Daily PnL"
           value={Number(summary.daily_pnl || 0).toFixed(2)}
@@ -95,7 +121,11 @@ export function DashboardView() {
           value={Number(summary.net_pnl || 0).toFixed(2)}
           tone={Number(summary.net_pnl || 0) >= 0 ? "positive" : "negative"}
         />
-        <MetricCard label="Total Trades" value={summary.total_trades || 0} detail="Persisted fills in PostgreSQL" />
+        <MetricCard
+          label="Total Trades"
+          value={summary.total_trades || 0}
+          detail="Persisted fills in PostgreSQL"
+        />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">

@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useToast } from "@/components/providers/toast-provider";
+
+const SELECTED_PAGE_SIZE = 24;
+const MARKETS_PAGE_SIZE = 12;
 
 export function MarketScannerPanel({ status, markets = [], onUpdated }) {
   const [selected, setSelected] = useState(status?.tradeMarkets || []);
@@ -15,6 +19,8 @@ export function MarketScannerPanel({ status, markets = [], onUpdated }) {
   const [autoRefreshMs, setAutoRefreshMs] = useState(status?.automation?.autoMarketRefreshMs || 120000);
   const [autoEnabled, setAutoEnabled] = useState(status?.automation?.autoMarketSelection || false);
   const [search, setSearch] = useState("");
+  const [selectedPage, setSelectedPage] = useState(1);
+  const [marketsPage, setMarketsPage] = useState(1);
   const [saving, setSaving] = useState(false);
   const [autoSelecting, setAutoSelecting] = useState(false);
   const { pushToast } = useToast();
@@ -26,7 +32,7 @@ export function MarketScannerPanel({ status, markets = [], onUpdated }) {
     setAutoEnabled(status?.automation?.autoMarketSelection || false);
   }, [status]);
 
-  const visibleMarkets = markets.filter((market) => {
+  const visibleMarkets = useMemo(() => markets.filter((market) => {
     const term = search.trim().toLowerCase();
     if (!term) return true;
     return [
@@ -37,7 +43,32 @@ export function MarketScannerPanel({ status, markets = [], onUpdated }) {
     ]
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(term));
-  });
+  }), [markets, search]);
+
+  const selectedTotalPages = Math.max(Math.ceil(selected.length / SELECTED_PAGE_SIZE), 1);
+  const marketsTotalPages = Math.max(Math.ceil(visibleMarkets.length / MARKETS_PAGE_SIZE), 1);
+
+  useEffect(() => {
+    setSelectedPage((current) => Math.min(current, selectedTotalPages));
+  }, [selectedTotalPages]);
+
+  useEffect(() => {
+    setMarketsPage(1);
+  }, [search]);
+
+  useEffect(() => {
+    setMarketsPage((current) => Math.min(current, marketsTotalPages));
+  }, [marketsTotalPages]);
+
+  const selectedPageItems = useMemo(() => {
+    const start = (selectedPage - 1) * SELECTED_PAGE_SIZE;
+    return selected.slice(start, start + SELECTED_PAGE_SIZE);
+  }, [selected, selectedPage]);
+
+  const visibleMarketPageItems = useMemo(() => {
+    const start = (marketsPage - 1) * MARKETS_PAGE_SIZE;
+    return visibleMarkets.slice(start, start + MARKETS_PAGE_SIZE);
+  }, [visibleMarkets, marketsPage]);
 
   function addMarkets(marketsToAdd) {
     setSelected((current) => [...new Set([...current, ...marketsToAdd])]);
@@ -92,16 +123,58 @@ export function MarketScannerPanel({ status, markets = [], onUpdated }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Market Scanner</CardTitle>
-        <CardDescription>Ranked markets by spread, volatility, and liquidity</CardDescription>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <CardTitle>Market Scanner</CardTitle>
+            <CardDescription>Ranked markets by spread, volatility, and liquidity</CardDescription>
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {selected.length} selected, {visibleMarkets.length} visible
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="flex flex-wrap gap-2">
-          {selected.map((item) => (
-            <Badge key={item} variant="success">
-              {item}
-            </Badge>
-          ))}
+        <div className="rounded-2xl border border-white/10 bg-secondary/20 p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="text-sm font-medium">Selected Markets</div>
+              <div className="text-xs text-muted-foreground">
+                Active trade markets applied to the bot runtime.
+              </div>
+            </div>
+            {selected.length > SELECTED_PAGE_SIZE ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setSelectedPage((current) => Math.max(current - 1, 1))}
+                  disabled={selectedPage === 1}
+                >
+                  Prev
+                </Button>
+                <div className="min-w-24 text-center text-xs text-muted-foreground">
+                  Page {selectedPage} / {selectedTotalPages}
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setSelectedPage((current) => Math.min(current + 1, selectedTotalPages))}
+                  disabled={selectedPage === selectedTotalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            ) : null}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {selectedPageItems.map((item) => (
+              <Badge key={item} variant="success">
+                {item}
+              </Badge>
+            ))}
+          </div>
         </div>
         <div className="grid gap-4 rounded-2xl border border-white/10 bg-secondary/20 p-4 md:grid-cols-3">
           <div className="space-y-2">
@@ -183,8 +256,38 @@ export function MarketScannerPanel({ status, markets = [], onUpdated }) {
             Clear
           </LoadingButton>
         </div>
+        <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-secondary/20 p-4 md:flex-row md:items-center md:justify-between">
+          <div className="text-sm text-muted-foreground">
+            Showing {visibleMarketPageItems.length === 0 ? 0 : (marketsPage - 1) * MARKETS_PAGE_SIZE + 1}
+            {" "}-{" "}
+            {Math.min(marketsPage * MARKETS_PAGE_SIZE, visibleMarkets.length)} of {visibleMarkets.length} markets
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setMarketsPage((current) => Math.max(current - 1, 1))}
+              disabled={marketsPage === 1}
+            >
+              Prev
+            </Button>
+            <div className="min-w-24 text-center text-xs text-muted-foreground">
+              Page {marketsPage} / {marketsTotalPages}
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setMarketsPage((current) => Math.min(current + 1, marketsTotalPages))}
+              disabled={marketsPage === marketsTotalPages}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
         <div className="grid gap-4 lg:grid-cols-2">
-          {visibleMarkets.map((market) => {
+          {visibleMarketPageItems.map((market) => {
             const active = selected.includes(market.market);
             return (
               <button

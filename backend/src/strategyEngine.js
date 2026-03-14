@@ -68,7 +68,10 @@ class StrategyEngine extends EventEmitter {
       config.strategy.stopLossPercent = this.parameters.stopLossPercent;
     }
     if (Number.isFinite(Number(nextConfig.repriceIntervalMs))) {
-      this.parameters.repriceIntervalMs = Number(nextConfig.repriceIntervalMs);
+      this.parameters.repriceIntervalMs = Math.max(
+        Number(nextConfig.repriceIntervalMs),
+        config.strategy.minRepriceIntervalMs
+      );
       config.strategy.repriceIntervalMs = this.parameters.repriceIntervalMs;
     }
     if (Number.isFinite(Number(nextConfig.repriceThresholdPercent))) {

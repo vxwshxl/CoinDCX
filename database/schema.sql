@@ -43,6 +43,17 @@ CREATE TABLE IF NOT EXISTS strategies (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS runtime_settings (
+  id SMALLINT PRIMARY KEY DEFAULT 1,
+  bot_mode TEXT NOT NULL DEFAULT 'paper',
+  max_position_size NUMERIC(24, 10) NOT NULL,
+  max_open_orders INTEGER NOT NULL,
+  daily_loss_limit NUMERIC(24, 10) NOT NULL,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT runtime_settings_singleton CHECK (id = 1)
+);
+
 CREATE TABLE IF NOT EXISTS bot_logs (
   id BIGSERIAL PRIMARY KEY,
   level TEXT NOT NULL,

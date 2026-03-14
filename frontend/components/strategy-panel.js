@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Switch } from "@/components/ui/switch";
 
+const MIN_REPRICE_INTERVAL_MS = 1000;
+
 export function StrategyPanel({ strategy, status, onUpdated }) {
   const [form, setForm] = useState({
     enabled: true,
@@ -24,6 +26,7 @@ export function StrategyPanel({ strategy, status, onUpdated }) {
   const [saving, setSaving] = useState(false);
   const { pushToast } = useToast();
   const estimatedTradeSize = Number(form.tradeSize || 0);
+  const exampleTradeSize = Math.max(Math.round(estimatedTradeSize), 0);
   const estimatedMinimumWallet = Math.ceil(
     estimatedTradeSize * Math.max(Number(status?.risk?.maxOpenOrders || 1), 1) * 1.25
   );
@@ -46,7 +49,10 @@ export function StrategyPanel({ strategy, status, onUpdated }) {
     event.preventDefault();
     setSaving(true);
     try {
-      const response = await api.updateStrategy(form);
+      const response = await api.updateStrategy({
+        ...form,
+        repriceIntervalMs: Math.max(Number(form.repriceIntervalMs || 0), MIN_REPRICE_INTERVAL_MS),
+      });
       onUpdated?.(response);
       pushToast({
         title: "Strategy saved",
@@ -97,7 +103,11 @@ export function StrategyPanel({ strategy, status, onUpdated }) {
                 }
               />
               <p className="text-xs text-muted-foreground">
-                Example: `500` means each new buy aims for about Rs 500 worth of the selected coin.
+                Example:{" "}
+                <span className="font-medium text-foreground">{exampleTradeSize}</span>
+                {" "}means each new buy aims for about{" "}
+                <span className="font-medium text-foreground">Rs {exampleTradeSize}</span>
+                {" "}worth of the selected coin.
               </p>
             </div>
             <div className="space-y-2">
@@ -162,6 +172,7 @@ export function StrategyPanel({ strategy, status, onUpdated }) {
               <Input
                 id="repriceIntervalMs"
                 type="number"
+                min={MIN_REPRICE_INTERVAL_MS}
                 value={form.repriceIntervalMs}
                 onChange={(event) =>
                   setForm((current) => ({
@@ -170,6 +181,9 @@ export function StrategyPanel({ strategy, status, onUpdated }) {
                   }))
                 }
               />
+              <p className="text-xs text-muted-foreground">
+                Pending orders keep being managed continuously, but repricing is limited to 1000 ms minimum.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="repriceThresholdPercent">Reprice Threshold %</Label>

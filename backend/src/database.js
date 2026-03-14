@@ -25,6 +25,18 @@ async function initDatabase() {
   }
 
   await query("SELECT 1");
+  await query(
+    `CREATE TABLE IF NOT EXISTS runtime_settings (
+      id SMALLINT PRIMARY KEY DEFAULT 1,
+      bot_mode TEXT NOT NULL DEFAULT 'paper',
+      max_position_size NUMERIC(24, 10) NOT NULL,
+      max_open_orders INTEGER NOT NULL,
+      daily_loss_limit NUMERIC(24, 10) NOT NULL,
+      metadata JSONB DEFAULT '{}'::jsonb,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CONSTRAINT runtime_settings_singleton CHECK (id = 1)
+    )`
+  );
   return true;
 }
 
@@ -95,6 +107,42 @@ async function upsertStrategy(strategy) {
       strategy.dipBuyPercent,
       strategy.markets,
       JSON.stringify(strategy.metadata || {}),
+    ]
+  );
+
+  return result.rows[0];
+}
+
+async function getRuntimeSettings() {
+  const result = await query(
+    `SELECT *
+     FROM runtime_settings
+     WHERE id = 1`
+  );
+
+  return result.rows[0] || null;
+}
+
+async function upsertRuntimeSettings(settings) {
+  const result = await query(
+    `INSERT INTO runtime_settings
+      (id, bot_mode, max_position_size, max_open_orders, daily_loss_limit, metadata)
+     VALUES (1, $1, $2, $3, $4, $5::jsonb)
+     ON CONFLICT (id)
+     DO UPDATE SET
+       bot_mode = EXCLUDED.bot_mode,
+       max_position_size = EXCLUDED.max_position_size,
+       max_open_orders = EXCLUDED.max_open_orders,
+       daily_loss_limit = EXCLUDED.daily_loss_limit,
+       metadata = EXCLUDED.metadata,
+       updated_at = NOW()
+     RETURNING *`,
+    [
+      settings.botMode,
+      settings.maxPositionSize,
+      settings.maxOpenOrders,
+      settings.dailyLossLimit,
+      JSON.stringify(settings.metadata || {}),
     ]
   );
 
@@ -239,6 +287,8 @@ module.exports = {
   getLatestLogs,
   getStrategies,
   upsertStrategy,
+  getRuntimeSettings,
+  upsertRuntimeSettings,
   storeMarketData,
   storeOrder,
   updateOrderStatus,

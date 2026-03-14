@@ -15,6 +15,8 @@ const parseBoolean = (value, fallback = false) => {
   return ["1", "true", "yes", "on"].includes(String(value).toLowerCase());
 };
 
+const MIN_REPRICE_INTERVAL_MS = 1000;
+
 const tradeMarkets = (process.env.TRADE_MARKETS || "BTCINR,ETHINR")
   .split(",")
   .map((market) => market.trim())
@@ -34,13 +36,17 @@ module.exports = {
     profitTargetPercent: parseNumber(process.env.PROFIT_TARGET_PERCENT, 0.5),
     dipBuyPercent: parseNumber(process.env.DIP_BUY_PERCENT, 0.3),
     stopLossPercent: parseNumber(process.env.STOP_LOSS_PERCENT, 1),
-    repriceIntervalMs: parseNumber(process.env.REPRICE_INTERVAL_MS, 3000),
+    repriceIntervalMs: Math.max(
+      parseNumber(process.env.REPRICE_INTERVAL_MS, 3000),
+      MIN_REPRICE_INTERVAL_MS
+    ),
     repriceThresholdPercent: parseNumber(process.env.REPRICE_THRESHOLD_PERCENT, 0.15),
     makerBufferPercent: parseNumber(process.env.MAKER_BUFFER_PERCENT, 0.05),
     autoSellEnabled: parseBoolean(process.env.AUTO_SELL_ENABLED, true),
     autoMarketSelection: parseBoolean(process.env.AUTO_MARKET_SELECTION, false),
     autoMarketSelectionCount: parseNumber(process.env.AUTO_MARKET_SELECTION_COUNT, 8),
     autoMarketRefreshMs: parseNumber(process.env.AUTO_MARKET_REFRESH_MS, 120000),
+    minRepriceIntervalMs: MIN_REPRICE_INTERVAL_MS,
   },
   risk: {
     maxPositionSize: parseNumber(process.env.MAX_POSITION_SIZE, 2000),

@@ -54,6 +54,7 @@ class BotController {
     });
 
     if (dbReady) {
+      await this.loadRuntimeSettings();
       await this.riskManager.initializeFromDatabase();
       await this.strategyEngine.initialize();
     }
@@ -142,6 +143,23 @@ class BotController {
     }, config.websocket.frontendHeartbeatMs);
   }
 
+  restartReconcileTimer() {
+    if (this.reconcileTimer) {
+      clearInterval(this.reconcileTimer);
+      this.reconcileTimer = null;
+    }
+
+    if (!this.botRunning) {
+      return;
+    }
+
+    this.reconcileTimer = setInterval(() => {
+      this.orderManager.reconcileLiveOrders().catch((error) => {
+        console.error("Order reconciliation failed:", error.message);
+      });
+    }, Math.max(config.strategy.repriceIntervalMs, config.strategy.minRepriceIntervalMs));
+  }
+
   broadcast(message) {
     if (!this.wss) return;
     const encoded = JSON.stringify(message);
@@ -163,6 +181,29 @@ class BotController {
       }).catch(() => {});
     } catch (error) {
       console.error("Failed to load market metadata:", error.message);
+    }
+  }
+
+  async loadRuntimeSettings() {
+    try {
+      const runtimeSettings = await db.getRuntimeSettings();
+      if (!runtimeSettings) {
+        await db.upsertRuntimeSettings({
+          botMode: config.botMode,
+          maxPositionSize: config.risk.maxPositionSize,
+          maxOpenOrders: config.risk.maxOpenOrders,
+          dailyLossLimit: config.risk.dailyLossLimit,
+          metadata: {},
+        });
+        return;
+      }
+
+      config.botMode = runtimeSettings.bot_mode === "live" ? "live" : "paper";
+      config.risk.maxPositionSize = Number(runtimeSettings.max_position_size);
+      config.risk.maxOpenOrders = Number(runtimeSettings.max_open_orders);
+      config.risk.dailyLossLimit = Number(runtimeSettings.daily_loss_limit);
+    } catch (error) {
+      console.error("Failed to load runtime settings:", error.message);
     }
   }
 
@@ -259,7 +300,7 @@ class BotController {
       this.orderManager.reconcileLiveOrders().catch((error) => {
         console.error("Order reconciliation failed:", error.message);
       });
-    }, Math.max(config.strategy.repriceIntervalMs, 3000));
+    }, Math.max(config.strategy.repriceIntervalMs, config.strategy.minRepriceIntervalMs));
     this.botRunning = true;
     await db.insertLog("info", "Bot started", { mode: config.botMode }).catch(() => {});
     return this.getStatus();
@@ -319,6 +360,9 @@ class BotController {
 
   async updateStrategy(body) {
     const strategy = await this.strategyEngine.updateConfig(body);
+    if (this.botRunning && Number.isFinite(Number(body.repriceIntervalMs))) {
+      this.restartReconcileTimer();
+    }
     this.broadcast({
       type: "strategy",
       payload: strategy,
@@ -328,14 +372,52 @@ class BotController {
 
   async updateSettings(body) {
     let requiresRestart = false;
+    let shouldRefreshReconcileTimer = false;
 
     if (body.mode === "paper" || body.mode === "live") {
       config.botMode = body.mode;
     }
+    if (Number.isFinite(Number(body.maxPositionSize))) {
+      config.risk.maxPositionSize = Number(body.maxPositionSize);
+    }
+    if (Number.isFinite(Number(body.maxOpenOrders))) {
+      config.risk.maxOpenOrders = Number(body.maxOpenOrders);
+    }
+    if (Number.isFinite(Number(body.dailyLossLimit))) {
+      config.risk.dailyLossLimit = Number(body.dailyLossLimit);
+    }
 
+    const strategyPatch = {};
     if (Number.isFinite(Number(body.tradeSize))) {
-      config.strategy.tradeSize = Number(body.tradeSize);
-      await this.strategyEngine.updateConfig({ tradeSize: config.strategy.tradeSize });
+      strategyPatch.tradeSize = Number(body.tradeSize);
+    }
+    if (typeof body.enabled === "boolean") {
+      strategyPatch.enabled = body.enabled;
+    }
+    if (Number.isFinite(Number(body.profitTargetPercent))) {
+      strategyPatch.profitTargetPercent = Number(body.profitTargetPercent);
+    }
+    if (Number.isFinite(Number(body.dipBuyPercent))) {
+      strategyPatch.dipBuyPercent = Number(body.dipBuyPercent);
+    }
+    if (Number.isFinite(Number(body.stopLossPercent))) {
+      strategyPatch.stopLossPercent = Number(body.stopLossPercent);
+    }
+    if (Number.isFinite(Number(body.repriceIntervalMs))) {
+      strategyPatch.repriceIntervalMs = Number(body.repriceIntervalMs);
+      shouldRefreshReconcileTimer = true;
+    }
+    if (Number.isFinite(Number(body.repriceThresholdPercent))) {
+      strategyPatch.repriceThresholdPercent = Number(body.repriceThresholdPercent);
+    }
+    if (Number.isFinite(Number(body.makerBufferPercent))) {
+      strategyPatch.makerBufferPercent = Number(body.makerBufferPercent);
+    }
+    if (typeof body.autoSellEnabled === "boolean") {
+      strategyPatch.autoSellEnabled = body.autoSellEnabled;
+    }
+    if (Object.keys(strategyPatch).length > 0) {
+      await this.strategyEngine.updateConfig(strategyPatch);
     }
     if (typeof body.autoMarketSelection === "boolean") {
       config.strategy.autoMarketSelection = body.autoMarketSelection;
@@ -361,15 +443,49 @@ class BotController {
       await this.stopBot();
       await this.loadMarketMetadata();
       await this.startBot();
+    } else if (this.botRunning && shouldRefreshReconcileTimer) {
+      this.restartReconcileTimer();
     }
 
     await db.insertLog("info", "Runtime settings updated", {
       mode: config.botMode,
       tradeSize: config.strategy.tradeSize,
+      enabled: this.strategyEngine.enabled,
+      profitTargetPercent: config.strategy.profitTargetPercent,
+      dipBuyPercent: config.strategy.dipBuyPercent,
+      stopLossPercent: config.strategy.stopLossPercent,
+      repriceIntervalMs: config.strategy.repriceIntervalMs,
+      repriceThresholdPercent: config.strategy.repriceThresholdPercent,
+      makerBufferPercent: config.strategy.makerBufferPercent,
+      autoSellEnabled: config.strategy.autoSellEnabled,
       tradeMarkets: config.tradeMarkets,
       autoMarketSelection: config.strategy.autoMarketSelection,
       autoMarketSelectionCount: config.strategy.autoMarketSelectionCount,
+      maxPositionSize: config.risk.maxPositionSize,
+      maxOpenOrders: config.risk.maxOpenOrders,
+      dailyLossLimit: config.risk.dailyLossLimit,
     }).catch(() => {});
+
+    await db.upsertRuntimeSettings({
+      botMode: config.botMode,
+      maxPositionSize: config.risk.maxPositionSize,
+      maxOpenOrders: config.risk.maxOpenOrders,
+      dailyLossLimit: config.risk.dailyLossLimit,
+      metadata: {
+        autoMarketSelection: config.strategy.autoMarketSelection,
+        autoMarketSelectionCount: config.strategy.autoMarketSelectionCount,
+        autoMarketRefreshMs: config.strategy.autoMarketRefreshMs,
+      },
+    }).catch(async (error) => {
+      await db.insertLog("warn", "Failed to persist runtime settings", {
+        error: error.message,
+      });
+    });
+
+    this.broadcast({
+      type: "strategy",
+      payload: this.strategyEngine.getConfig(),
+    });
 
     return this.getStatus();
   }

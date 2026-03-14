@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ActivityLogPanel } from "@/components/activity-log-panel";
 import { AppShell } from "@/components/app-shell";
 import { MetricCard } from "@/components/metric-card";
 import { PendingOrdersPanel } from "@/components/pending-orders-panel";
@@ -15,7 +16,7 @@ import { useDashboardData } from "@/lib/use-dashboard-data";
 import { api } from "@/lib/api";
 
 export function DashboardView() {
-  const { status, prices, trades, connectionState, setStatus, refreshStatus } = useDashboardData();
+  const { status, prices, trades, logs, connectionState, setStatus, refreshStatus } = useDashboardData();
   const [starting, setStarting] = useState(false);
   const [stopping, setStopping] = useState(false);
   const { pushToast } = useToast();
@@ -133,6 +134,8 @@ export function DashboardView() {
       </section>
 
       <PendingOrdersPanel orders={pendingOrders} onRefresh={refreshStatus} />
+
+      <ActivityLogPanel logs={logs} />
 
       <TradesTable trades={trades.slice(0, 12)} />
     </AppShell>

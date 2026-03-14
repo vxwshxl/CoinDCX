@@ -305,6 +305,10 @@ class BotController {
     return db.getLatestTrades(100);
   }
 
+  async getLogs() {
+    return db.getLatestLogs(80);
+  }
+
   async cancelOrder(orderId) {
     return this.orderManager.cancelOrder(orderId);
   }

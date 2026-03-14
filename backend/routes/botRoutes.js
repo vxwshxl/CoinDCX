@@ -35,5 +35,13 @@ module.exports = ({ botController }) => {
     }
   });
 
+  router.get("/logs", async (_req, res, next) => {
+    try {
+      res.json(await botController.getLogs());
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return router;
 };

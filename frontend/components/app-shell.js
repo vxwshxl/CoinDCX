@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bot, CandlestickChart, Gauge, Settings2, Sparkles, Wallet } from "lucide-react";
+import { BookOpenText, Bot, CandlestickChart, Gauge, Settings2, Sparkles, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
@@ -12,6 +12,7 @@ const navigation = [
   { href: "/strategies", label: "Strategies", icon: Sparkles },
   { href: "/markets", label: "Markets", icon: CandlestickChart },
   { href: "/settings", label: "Settings", icon: Settings2 },
+  { href: "/guide", label: "Guide", icon: BookOpenText },
 ];
 
 export function AppShell({ connectionState, children }) {

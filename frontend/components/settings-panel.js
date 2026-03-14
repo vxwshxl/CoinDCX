@@ -56,7 +56,6 @@ export function SettingsPanel({ status, onUpdated }) {
           <TabsList>
             <TabsTrigger value="mode">Mode</TabsTrigger>
             <TabsTrigger value="lifecycle">Lifecycle</TabsTrigger>
-            <TabsTrigger value="guide">Guide</TabsTrigger>
           </TabsList>
           <TabsContent value="mode" className="grid gap-4 md:max-w-xl">
             <div className="space-y-2">
@@ -142,44 +141,6 @@ export function SettingsPanel({ status, onUpdated }) {
             >
               Stop Bot
             </LoadingButton>
-          </TabsContent>
-          <TabsContent value="guide" className="space-y-4 text-sm text-muted-foreground">
-            <div className="rounded-2xl border border-white/10 bg-secondary/20 p-4">
-              <div className="font-medium text-foreground">How this bot trades</div>
-              <p className="mt-2">
-                The bot listens to live market data, buys a fixed INR amount when the dip rule triggers,
-                places a pending limit sell, keeps repricing that sell order, and exits with stop loss if needed.
-              </p>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-secondary/20 p-4">
-                <div className="font-medium text-foreground">Trade Size</div>
-                <p className="mt-2">Fixed amount per entry. `500` means buy roughly Rs 500 worth of a coin, not your whole wallet.</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-secondary/20 p-4">
-                <div className="font-medium text-foreground">Profit Target %</div>
-                <p className="mt-2">Minimum profit floor used when placing or repricing the sell limit order.</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-secondary/20 p-4">
-                <div className="font-medium text-foreground">Stop Loss %</div>
-                <p className="mt-2">If price drops this much below entry, the bot cancels the pending sell and exits the position.</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-secondary/20 p-4">
-                <div className="font-medium text-foreground">Reprice Interval / Threshold</div>
-                <p className="mt-2">Controls how often the bot is allowed to move the pending sell order and by how much price must change first.</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-secondary/20 p-4">
-                <div className="font-medium text-foreground">Maker Buffer %</div>
-                <p className="mt-2">Extra markup placed above the latest price when maintaining the sell order.</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-secondary/20 p-4">
-                <div className="font-medium text-foreground">Paper vs Live</div>
-                <p className="mt-2">Paper mode simulates execution. Live mode sends real CoinDCX orders through your API key.</p>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-primary/20 bg-primary/10 p-4 text-foreground">
-              Start in paper mode, confirm pending orders and exits behave as expected, then switch to live only after rotating your API keys and verifying small trade sizes.
-            </div>
           </TabsContent>
         </Tabs>
       </CardContent>

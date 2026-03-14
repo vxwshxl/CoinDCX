@@ -20,6 +20,7 @@ async function request(path, options = {}) {
 
 export const api = {
   getStatus: () => request("/api/status"),
+  getLogs: () => request("/api/logs"),
   startBot: () => request("/api/start-bot", { method: "POST" }),
   stopBot: () => request("/api/stop-bot", { method: "POST" }),
   getPrices: () => request("/api/prices"),

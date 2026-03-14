@@ -50,6 +50,18 @@ async function getLatestTrades(limit = 50) {
   return result.rows;
 }
 
+async function getLatestLogs(limit = 80) {
+  const result = await query(
+    `SELECT *
+     FROM bot_logs
+     ORDER BY created_at DESC
+     LIMIT $1`,
+    [limit]
+  );
+
+  return result.rows;
+}
+
 async function getStrategies() {
   const result = await query(
     `SELECT *
@@ -224,6 +236,7 @@ module.exports = {
   initDatabase,
   insertLog,
   getLatestTrades,
+  getLatestLogs,
   getStrategies,
   upsertStrategy,
   storeMarketData,

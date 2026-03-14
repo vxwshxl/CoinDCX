@@ -8,6 +8,7 @@ export function useDashboardData() {
   const [status, setStatus] = useState(null);
   const [prices, setPrices] = useState([]);
   const [trades, setTrades] = useState([]);
+  const [logs, setLogs] = useState([]);
   const [strategies, setStrategies] = useState([]);
   const [markets, setMarkets] = useState([]);
   const [connectionState, setConnectionState] = useState("connecting");
@@ -17,11 +18,12 @@ export function useDashboardData() {
     let socket;
 
     async function load() {
-      const [statusData, pricesData, tradesData, strategyData, marketsData] =
+      const [statusData, pricesData, tradesData, logsData, strategyData, marketsData] =
         await Promise.all([
           api.getStatus(),
           api.getPrices(),
           api.getTrades(),
+          api.getLogs(),
           api.getStrategies(),
           api.getMarkets(),
         ]);
@@ -31,6 +33,7 @@ export function useDashboardData() {
       setStatus(statusData);
       setPrices(pricesData);
       setTrades(tradesData);
+      setLogs(logsData);
       setStrategies(strategyData);
       setMarkets(marketsData);
     }
@@ -61,10 +64,11 @@ export function useDashboardData() {
           || message.type === "strategy"
           || message.type === "pending-order"
         ) {
-          Promise.all([api.getStatus(), api.getTrades(), api.getStrategies()])
-            .then(([statusData, tradesData, strategiesData]) => {
+          Promise.all([api.getStatus(), api.getTrades(), api.getLogs(), api.getStrategies()])
+            .then(([statusData, tradesData, logsData, strategiesData]) => {
               setStatus(statusData);
               setTrades(tradesData);
+              setLogs(logsData);
               setStrategies(strategiesData);
             })
             .catch(console.error);
@@ -77,6 +81,7 @@ export function useDashboardData() {
 
     const interval = window.setInterval(() => {
       api.getStatus().then(setStatus).catch(console.error);
+      api.getLogs().then(setLogs).catch(console.error);
     }, 12000);
 
     return () => {
@@ -95,12 +100,14 @@ export function useDashboardData() {
     status,
     prices,
     trades,
+    logs,
     strategies,
     activeStrategy,
     markets,
     connectionState,
     refreshStatus: () => api.getStatus().then(setStatus),
     refreshTrades: () => api.getTrades().then(setTrades),
+    refreshLogs: () => api.getLogs().then(setLogs),
     refreshStrategies: () => api.getStrategies().then(setStrategies),
     refreshMarkets: () => api.getMarkets().then(setMarkets),
     setStatus,

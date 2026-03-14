@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Switch } from "@/components/ui/switch";
 
-export function StrategyPanel({ strategy, onUpdated }) {
+export function StrategyPanel({ strategy, status, onUpdated }) {
   const [form, setForm] = useState({
     enabled: true,
     tradeSize: 300,
@@ -23,6 +23,10 @@ export function StrategyPanel({ strategy, onUpdated }) {
   });
   const [saving, setSaving] = useState(false);
   const { pushToast } = useToast();
+  const estimatedTradeSize = Number(form.tradeSize || 0);
+  const estimatedMinimumWallet = Math.ceil(
+    estimatedTradeSize * Math.max(Number(status?.risk?.maxOpenOrders || 1), 1) * 1.25
+  );
 
   useEffect(() => {
     setForm({
@@ -63,7 +67,9 @@ export function StrategyPanel({ strategy, onUpdated }) {
     <Card>
       <CardHeader>
         <CardTitle>Strategy Controls</CardTitle>
-        <CardDescription>Scalping configuration with runtime updates</CardDescription>
+        <CardDescription>
+          Scalping configuration with runtime updates. Trade Size here means INR per trade entry.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form className="grid gap-5" onSubmit={handleSubmit}>
@@ -81,7 +87,7 @@ export function StrategyPanel({ strategy, onUpdated }) {
           </div>
           <div className="grid gap-5 md:grid-cols-3">
             <div className="space-y-2">
-              <Label htmlFor="tradeSize">Trade Size</Label>
+              <Label htmlFor="tradeSize">Trade Size (INR per trade)</Label>
               <Input
                 id="tradeSize"
                 type="number"
@@ -90,6 +96,9 @@ export function StrategyPanel({ strategy, onUpdated }) {
                   setForm((current) => ({ ...current, tradeSize: Number(event.target.value) }))
                 }
               />
+              <p className="text-xs text-muted-foreground">
+                Example: `500` means each new buy aims for about Rs 500 worth of the selected coin.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="profitTargetPercent">Profit Target %</Label>
@@ -121,6 +130,16 @@ export function StrategyPanel({ strategy, onUpdated }) {
                 }
               />
             </div>
+          </div>
+          <div className="rounded-2xl border border-primary/15 bg-primary/10 p-4 text-sm">
+            <div className="font-medium text-foreground">Wallet Guidance</div>
+            <p className="mt-2 text-muted-foreground">
+              For this current setup, a practical minimum wallet balance is about
+              {" "}
+              <span className="font-semibold text-foreground">Rs {estimatedMinimumWallet}</span>
+              {" "}
+              so the bot can place entries, maintain pending orders, and absorb small fee/slippage buffers.
+            </p>
           </div>
           <div className="grid gap-5 md:grid-cols-4">
             <div className="space-y-2">

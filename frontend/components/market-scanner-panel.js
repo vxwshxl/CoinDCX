@@ -18,6 +18,7 @@ export function MarketScannerPanel({ status, markets = [], onUpdated }) {
   const [autoCount, setAutoCount] = useState(status?.automation?.autoMarketSelectionCount || 8);
   const [autoRefreshMs, setAutoRefreshMs] = useState(status?.automation?.autoMarketRefreshMs || 120000);
   const [autoEnabled, setAutoEnabled] = useState(status?.automation?.autoMarketSelection || false);
+  const [autoQuote, setAutoQuote] = useState(status?.automation?.autoMarketQuote || "INR");
   const [search, setSearch] = useState("");
   const [selectedPage, setSelectedPage] = useState(1);
   const [marketsPage, setMarketsPage] = useState(1);
@@ -30,6 +31,7 @@ export function MarketScannerPanel({ status, markets = [], onUpdated }) {
     setAutoCount(status?.automation?.autoMarketSelectionCount || 8);
     setAutoRefreshMs(status?.automation?.autoMarketRefreshMs || 120000);
     setAutoEnabled(status?.automation?.autoMarketSelection || false);
+    setAutoQuote(status?.automation?.autoMarketQuote || "INR");
   }, [status]);
 
   const visibleMarkets = useMemo(() => markets.filter((market) => {
@@ -101,12 +103,13 @@ export function MarketScannerPanel({ status, markets = [], onUpdated }) {
         autoMarketSelection: autoEnabled,
         autoMarketSelectionCount: autoCount,
         autoMarketRefreshMs: autoRefreshMs,
+        autoMarketQuote: autoQuote,
       });
       onUpdated?.(response);
       pushToast({
         title: "Auto market selection updated",
         description: autoEnabled
-          ? "The bot will keep selecting top scanned markets automatically."
+          ? `The bot will keep selecting top scanned ${autoQuote} markets automatically.`
           : "Automatic market selection has been disabled.",
       });
     } catch (error) {
@@ -206,6 +209,24 @@ export function MarketScannerPanel({ status, markets = [], onUpdated }) {
               <option value="false">Manual</option>
               <option value="true">Automatic</option>
             </select>
+          </div>
+        </div>
+        <div className="grid gap-4 rounded-2xl border border-white/10 bg-secondary/20 p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="space-y-2">
+            <Label htmlFor="auto-quote">Automatic Universe</Label>
+            <select
+              id="auto-quote"
+              value={autoQuote}
+              onChange={(event) => setAutoQuote(event.target.value)}
+              className="flex h-10 w-full rounded-xl border border-input bg-secondary/40 px-3 py-2 text-sm"
+            >
+              <option value="INR">INR pairs</option>
+              <option value="USDT">USDT pairs</option>
+              <option value="BTC">BTC pairs</option>
+            </select>
+          </div>
+          <div className="rounded-2xl border border-primary/15 bg-primary/10 p-4 text-sm text-muted-foreground">
+            Automatic mode now prefers markets that match your selected quote currency and are compatible with your current trade size.
           </div>
         </div>
         <div className="grid gap-4 rounded-2xl border border-white/10 bg-secondary/20 p-4 md:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto]">
@@ -308,15 +329,25 @@ export function MarketScannerPanel({ status, markets = [], onUpdated }) {
               >
                 <div className="flex items-center justify-between">
                   <div className="text-lg font-semibold">{market.market}</div>
-                  <Badge variant={active ? "default" : "outline"}>
-                    {active ? "Selected" : "Candidate"}
-                  </Badge>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <Badge variant={market.compatible ? "success" : "outline"}>
+                      {market.compatible ? "Compatible" : "Skipped"}
+                    </Badge>
+                    <Badge variant={active ? "default" : "outline"}>
+                      {active ? "Selected" : "Candidate"}
+                    </Badge>
+                  </div>
                 </div>
                 <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
                   <div>Volume: {Number(market.volume || 0).toFixed(2)}</div>
                   <div>Spread: {Number(market.spreadPercent || 0).toFixed(4)}%</div>
                   <div>Volatility: {Number(market.volatilityPercent || 0).toFixed(4)}%</div>
                   <div>Last Price: {Number(market.lastPrice || 0).toFixed(4)}</div>
+                  <div>Est. Quantity: {Number(market.estimatedQuantity || 0).toFixed(8)}</div>
+                  <div>Est. Notional: {Number(market.estimatedNotional || 0).toFixed(2)}</div>
+                  {!market.compatible ? (
+                    <div className="text-rose-300">{market.compatibilityReason || "Skipped by automation"}</div>
+                  ) : null}
                 </div>
               </button>
             );

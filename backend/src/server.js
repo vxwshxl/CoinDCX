@@ -205,6 +205,9 @@ class BotController {
       config.strategy.immediateEntryOnStart = Boolean(
         runtimeSettings.metadata?.immediateEntryOnStart
       );
+      config.strategy.autoMarketQuote = String(
+        runtimeSettings.metadata?.autoMarketQuote || config.strategy.autoMarketQuote || "INR"
+      ).toUpperCase();
     } catch (error) {
       console.error("Failed to load runtime settings:", error.message);
     }
@@ -223,6 +226,7 @@ class BotController {
         autoMarketSelectionCount: config.strategy.autoMarketSelectionCount,
         autoMarketRefreshMs: config.strategy.autoMarketRefreshMs,
         immediateEntryOnStart: config.strategy.immediateEntryOnStart,
+        autoMarketQuote: config.strategy.autoMarketQuote,
       },
     };
   }
@@ -285,10 +289,22 @@ class BotController {
     }
 
     const scanned = await this.marketScanner.scanTopMarkets(
-      config.strategy.autoMarketSelectionCount
+      Math.max(config.strategy.autoMarketSelectionCount * 3, config.strategy.autoMarketSelectionCount),
+      {
+        quoteCurrency: config.strategy.autoMarketQuote,
+        tradeSize: config.strategy.tradeSize,
+      }
     );
-    const selectedMarkets = scanned.map((item) => item.market).filter(Boolean);
+    const selectedMarkets = scanned
+      .filter((item) => item.compatible)
+      .slice(0, config.strategy.autoMarketSelectionCount)
+      .map((item) => item.market)
+      .filter(Boolean);
     if (selectedMarkets.length === 0) {
+      await db.insertLog("warn", "Auto market selection found no compatible markets", {
+        quoteCurrency: config.strategy.autoMarketQuote,
+        tradeSize: config.strategy.tradeSize,
+      }).catch(() => {});
       return this.getStatus();
     }
 
@@ -306,6 +322,9 @@ class BotController {
 
     await db.insertLog("info", "Auto market selection updated active markets", {
       tradeMarkets: config.tradeMarkets,
+      quoteCurrency: config.strategy.autoMarketQuote,
+      requestedCount: config.strategy.autoMarketSelectionCount,
+      compatibleCount: selectedMarkets.length,
     }).catch(() => {});
 
     if (this.botRunning) {
@@ -491,6 +510,10 @@ class BotController {
       config.strategy.autoMarketRefreshMs = Number(body.autoMarketRefreshMs);
       requiresRestart = true;
     }
+    if (typeof body.autoMarketQuote === "string" && body.autoMarketQuote.trim()) {
+      config.strategy.autoMarketQuote = body.autoMarketQuote.trim().toUpperCase();
+      requiresRestart = true;
+    }
 
     if (Array.isArray(body.tradeMarkets) && body.tradeMarkets.length > 0) {
       config.tradeMarkets.length = 0;
@@ -522,6 +545,7 @@ class BotController {
       tradeMarkets: config.tradeMarkets,
       autoMarketSelection: config.strategy.autoMarketSelection,
       autoMarketSelectionCount: config.strategy.autoMarketSelectionCount,
+      autoMarketQuote: config.strategy.autoMarketQuote,
       maxPositionSize: config.risk.maxPositionSize,
       maxOpenOrders: config.risk.maxOpenOrders,
       dailyLossLimit: config.risk.dailyLossLimit,
@@ -537,6 +561,7 @@ class BotController {
         autoMarketSelectionCount: config.strategy.autoMarketSelectionCount,
         autoMarketRefreshMs: config.strategy.autoMarketRefreshMs,
         immediateEntryOnStart: config.strategy.immediateEntryOnStart,
+        autoMarketQuote: config.strategy.autoMarketQuote,
       },
     }).catch(async (error) => {
       await db.insertLog("warn", "Failed to persist runtime settings", {
@@ -553,7 +578,10 @@ class BotController {
   }
 
   async getMarkets() {
-    return this.marketScanner.scanTopMarkets(120);
+    return this.marketScanner.scanTopMarkets(120, {
+      quoteCurrency: config.strategy.autoMarketQuote,
+      tradeSize: config.strategy.tradeSize,
+    });
   }
 
   async updateMarkets(body) {

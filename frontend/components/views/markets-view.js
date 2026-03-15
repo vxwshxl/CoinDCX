@@ -7,13 +7,14 @@ import { useDashboardData } from "@/lib/use-dashboard-data";
 
 export function MarketsView() {
   const { status, markets, connectionState, setStatus } = useDashboardData();
+  const autoQuote = status?.automation?.autoMarketQuote || "INR";
 
   return (
     <AppShell connectionState={connectionState}>
       <PageHeader
         eyebrow="Discovery"
         title="Market Selection"
-        description="Rank and choose tradeable markets from CoinDCX scanning signals."
+        description={`Rank and choose tradeable markets from CoinDCX scanning signals. Automatic mode can maintain a ${autoQuote}-first shortlist for you.`}
       />
       <MarketScannerPanel status={status} markets={markets} onUpdated={setStatus} />
     </AppShell>

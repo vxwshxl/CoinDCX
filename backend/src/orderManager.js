@@ -50,6 +50,47 @@ class OrderManager {
     return Number(adjusted.toFixed(precision));
   }
 
+  validateEntrySize(price, marketMeta = {}) {
+    const totalQuantity = this.calculateQuantity(marketMeta.market, price, marketMeta);
+    const notional = Number((totalQuantity * price).toFixed(8));
+    const minQuantity = Number(
+      marketMeta.min_quantity
+      || marketMeta.min_quantity_per_order
+      || marketMeta.min_trade_amount
+      || 0
+    );
+    const minNotional = Number(
+      marketMeta.min_notional
+      || marketMeta.min_notional_value
+      || marketMeta.min_amount
+      || 0
+    );
+
+    if (!Number.isFinite(totalQuantity) || totalQuantity <= 0) {
+      return { valid: false, reason: "Trade size is too small for this market", totalQuantity, notional };
+    }
+
+    if (minQuantity > 0 && totalQuantity < minQuantity) {
+      return {
+        valid: false,
+        reason: `Quantity below exchange minimum (${minQuantity})`,
+        totalQuantity,
+        notional,
+      };
+    }
+
+    if (minNotional > 0 && notional < minNotional) {
+      return {
+        valid: false,
+        reason: `Order notional below exchange minimum (${minNotional})`,
+        totalQuantity,
+        notional,
+      };
+    }
+
+    return { valid: true, totalQuantity, notional };
+  }
+
   roundPrice(price, marketMeta = {}) {
     const precision =
       typeof marketMeta.base_currency_precision === "number"
@@ -95,8 +136,23 @@ class OrderManager {
       return { success: false, reason: "Market already has an active position or order" };
     }
 
-    const totalQuantity = this.calculateQuantity(market, price, marketMeta);
-    const proposedOrderValue = totalQuantity * price;
+    const entryValidation = this.validateEntrySize(price, {
+      ...marketMeta,
+      market,
+    });
+    if (!entryValidation.valid) {
+      await db.insertLog("warn", "Order rejected before placement", {
+        market,
+        side: "buy",
+        reason: entryValidation.reason,
+        totalQuantity: entryValidation.totalQuantity,
+        notional: entryValidation.notional,
+      });
+      return { success: false, reason: entryValidation.reason };
+    }
+
+    const { totalQuantity } = entryValidation;
+    const proposedOrderValue = entryValidation.notional;
     const riskCheck = await this.riskManager.check({
       openOrdersCount: this.getOpenOrderCount(),
       proposedOrderValue,
@@ -218,16 +274,23 @@ class OrderManager {
 
       return { success: true, order: orderRecord, execution, position };
     } catch (error) {
+      const exchangeError =
+        error.response?.data?.message
+        || error.response?.data?.error
+        || error.response?.data?.status
+        || error.message;
       this.openOrders.delete(pendingOrder.id);
       await db.updateOrderStatus(pendingOrder.id, "failed", {
-        error: error.message,
+        error: exchangeError,
+        exchangeError: error.response?.data || null,
       });
       await db.insertLog("error", "Order placement failed", {
         market,
         side: "buy",
-        error: error.message,
+        error: exchangeError,
+        exchangeError: error.response?.data || null,
       });
-      return { success: false, reason: error.message };
+      return { success: false, reason: exchangeError };
     }
   }
 

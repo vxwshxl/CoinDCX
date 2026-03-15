@@ -47,6 +47,7 @@ module.exports = {
     autoMarketSelection: parseBoolean(process.env.AUTO_MARKET_SELECTION, false),
     autoMarketSelectionCount: parseNumber(process.env.AUTO_MARKET_SELECTION_COUNT, 8),
     autoMarketRefreshMs: parseNumber(process.env.AUTO_MARKET_REFRESH_MS, 120000),
+    autoMarketQuote: (process.env.AUTO_MARKET_QUOTE || "INR").trim().toUpperCase(),
     minRepriceIntervalMs: MIN_REPRICE_INTERVAL_MS,
   },
   risk: {
